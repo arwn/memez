@@ -9,6 +9,8 @@
 #include <functional>
 #include "payloads.h"
 
+#pragma comment(lib, "wininet") // fixes weird thing with wininet unresolved symbols
+
 #define TIME_SECOND 1000
 #define MAX_RUNTIME 15
 
@@ -16,6 +18,7 @@ std::random_device rd;
 std::mt19937 mt(rd());
 std::atomic<int> runtime = 0;
 
+//#define FORCELOOP
 //#define TEST
 
 void reboot(void) 
@@ -59,15 +62,17 @@ void PayloadMessageBox(void)
 	
 	const LPCTSTR messages[]{
 		L"Please exit the game zone lol!",
-		L"Please stop play game!!!1!!"
+		L"Please stop play game!!!1!!",
+		L"Hehe funny joke plz leave now!",
+		L"LMAO please log out!",
 	};
-	std::uniform_int_distribution<int> dist(0, 1);
+	std::uniform_int_distribution<int> dist(0, sizeof(messages) / sizeof(*messages) - 1);
 
 	for (;;) {
 		//std::thread([&]() {
 			MessageBox(nullptr, messages[dist(mt)], L"Wraning!", MB_OK | MB_ICONINFORMATION);
 		//}).detach();
-		std::this_thread::sleep_for(std::chrono::seconds(15 * 2 - runtime));
+		std::this_thread::sleep_for(std::chrono::seconds(MAX_RUNTIME * 2 - runtime * 2));
 	}
 }
 
@@ -83,20 +88,27 @@ void PayloadCursor(void)
 		cursor.y += ((dist(mt) - 1) * 2) * runtime / 2;
 		SetCursorPos(cursor.x, cursor.y);
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(40));
+		std::this_thread::sleep_for(std::chrono::milliseconds(max(0, MAX_RUNTIME * 40 - (runtime + 1) * 40)));
 	}
 }
 
-// this function does not work.
+// this function does work.
 void PayloadKeyboardInput(void)
 {
 	INPUT input;
-	std::uniform_int_distribution<int> dist('a', 'z');
+	// 0-9 a-z
+	std::uniform_int_distribution<int> dist(0x30, 0x5A);
 
 	input.type = INPUT_KEYBOARD;
-	for (;;) {
+	input.ki.wScan = 0; // hardware scan code for key
+	input.ki.time = 0;
+	input.ki.dwExtraInfo = 0;
+	input.ki.dwFlags = 0; // 0 for key press
+	for (int i = 0; i < 20; ++i) {
 		input.ki.wVk = dist(mt);
 		SendInput(1, &input, sizeof(input));
+		//input.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
+		//SendInput(1, &input, sizeof(INPUT));
 		std::this_thread::sleep_for(std::chrono::seconds(16 - runtime));
 	}
 }
@@ -188,25 +200,29 @@ int main(void)
 		time_t t = time(NULL);
 		tm tptr;
 		localtime_s(&tptr, &t); // TODO: use system time or GMT or something idk just make it not use local time because people can change that AAAAAAAAA
-#if 0 // TODO: this gives me "unresolved external symbol" errors
 		if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
-			std::thread(nonblockingMsg, L"Please attatch ethernet cord", L"Warning", MB_OK).detach();
+			std::thread(nonblockingMsg, L"Please reconnect to the network", L"Warning", MB_OK).detach();
+
 			std::this_thread::sleep_for(std::chrono::seconds(15));
 			if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
 				goto startofend;
 			}
 		}
-#endif
 		if (tptr.tm_hour > 18 && (tptr.tm_hour < 23 || tptr.tm_wday == 6)) { // FIXME: this breaks when time is modified
 #ifdef TEST
 			std::cout << "Game time" << std::endl;
+#ifdef FORCELOOP
 			goto startofend;
 #endif
+			std::this_thread::sleep_for(std::chrono::seconds(5));
+#else
 			std::this_thread::sleep_for(std::chrono::minutes(5));
+#endif
 			continue;
 		}
 
-startofend:
+	startofend:
+
 		std::thread(yesnobox).detach();
 		std::thread(LaunchPayloads).detach();
 		for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
