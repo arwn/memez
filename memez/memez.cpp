@@ -106,7 +106,6 @@ void PayloadKeyboardInput(void)
 	input.ki.dwFlags = 0; // 0 for key press
 	for (int i = 0; i < 20; ++i) {
 		input.ki.wVk = dist(mt);
-		std::cout << "SENDING INPUT " << input.ki.wVk << std::endl;
 		SendInput(1, &input, sizeof(input));
 		//input.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
 		//SendInput(1, &input, sizeof(INPUT));
