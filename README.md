@@ -9,7 +9,7 @@ Works on windows.
 ## installation
 You can build with msvs as usual. Compilation by hand is also possible; `c++ -o memez memez.cpp`.
 
-# as a service
+### as a service
 1) edit the install.ps1 and add the target username to the $username variable
 2) run install.ps1 from the root folder of the project.
 To verify that it was installed run `Get-ScheduledTask` and look for the memez*. `Get-ScheduledTask` also takes a -Name flag.
